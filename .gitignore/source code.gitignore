@@ -1,0 +1,418 @@
+Tab Tab1 = instance.ActiveTab;
+string strVibor = project.Variables["vibor"].Value;
+if (strVibor=="Публикация на ЯПлакал") return "oki";
+var tblResult = project.Tables["Result"];
+
+string strNumRandom = project.Variables["num_random"].Value;
+if (strNumRandom.Contains("2")) {
+	project.SendInfoToLog("Перегенерирую все значения и продолжаю работу",true);
+	instance.Reload();
+}
+
+instance.ClearCache(); //очищаю кэш
+instance.ClearCookie(); //очищаю куки
+
+bool blnFlash = Convert.ToBoolean(project.Variables["flash"].Value);
+if (blnFlash) {
+	instance.UsePlugins = false; // Отключает Flash, Java, Silverlight
+}
+
+int i=0;
+Random rndGenerator = new Random();
+
+IZennoList lstSites = project.Lists["ua"];
+IZennoList lstProxy = project.Lists["proxy"];
+IZennoList lstUsedProxy = project.Lists["used_proxy"];
+
+bool blnAdds = Convert.ToBoolean(project.Variables["Adds"].Value);
+if (blnAdds) {
+	instance.UseAdds = false; //запрещаю показ рекламы
+}
+bool blnPopup = Convert.ToBoolean(project.Variables["popup"].Value);
+if (blnPopup) {
+	instance.AllowPopUp = false; //запрещаю всплывающие окна
+}
+instance.UseCSS = true;
+instance.UseMedia = true;
+
+bool blnCanvas = Convert.ToBoolean(project.Variables["canvas"].Value);
+if (blnCanvas) {
+	instance.CanvasRenderMode = ZennoLab.InterfacesLibrary.Enums.Browser.CanvasMode.Emulate; //включаем эмуляцию канваса
+	instance.CanvasRenderSeed = Guid.NewGuid().ToString(); //генерируем новый Canvas Seed
+}
+
+SibboraHelper.WebHelper wHelper = new SibboraHelper.WebHelper(instance, project);
+wHelper.GlobalKMEmulate = true;
+
+bool ProtectXPath = true;
+
+int PauseBefore = rndGenerator.Next(0, 50);
+int PauseBetweenChecks = rndGenerator.Next(0, 50);
+int Timeout = rndGenerator.Next(15000, 30000);
+int FullEmulationDelayFrom = rndGenerator.Next(0, 50);
+int FullEmulationDelayTo = rndGenerator.Next(0, 50);
+int SendTextMinDelay = rndGenerator.Next(0, 50);
+int SendTextMaxDelay = rndGenerator.Next(0, 50);
+
+int intSpeedModeSend = rndGenerator.Next(0, 5000);
+wHelper.PauseBefore = intSpeedModeSend;
+
+bool blnMouseEmulate = Convert.ToBoolean(project.Variables["mouse"].Value);
+wHelper.GlobalKMEmulate = blnMouseEmulate;
+
+wHelper.PauseBefore = rndGenerator.Next(1000,5000);
+
+bool blnUserGen = Convert.ToBoolean(project.Variables["user_gen"].Value);
+if (blnUserGen) {
+	// Выбираем случайную версию Firefox
+	string version = Macros.TextProcessing.Spintax("{38|39|40|41|42|43|44|45|46|47|48|49|50|51|52|53}");
+	 
+	//Формируем набор buildID нашего Firefox (у каждой версии свой) [Идея хранения позаимствована у doc'a, за что ему большая благодарность!]
+	Dictionary <string, string> buildIDSet = new Dictionary <string, string>();
+	buildIDSet.Add("53", "20170413192749");
+	buildIDSet.Add("52", "20170316213829");
+	buildIDSet.Add("51", "20170125094131");
+	buildIDSet.Add("50", "20161104212021");
+	buildIDSet.Add("49", "20161019084923");
+	buildIDSet.Add("48", "20160817112116");
+	buildIDSet.Add("47", "20160623154057");
+	buildIDSet.Add("46", "20160502172042");
+	buildIDSet.Add("45", "20160905130425");
+	buildIDSet.Add("44", "20160210153822");
+	buildIDSet.Add("43", "20160105164030");
+	buildIDSet.Add("42", "20151029151421");
+	buildIDSet.Add("41", "20151014143721");
+	buildIDSet.Add("40", "20150812163655");
+	buildIDSet.Add("39", "20150618135210");
+	buildIDSet.Add("38", "20150513174244");
+	 
+	instance.ShowNavigatorField(ZennoLab.InterfacesLibrary.Enums.Browser.NavigatorField.BuildId);
+	// Устанавливаем BuildID
+	instance.SetHeader(ZennoLab.InterfacesLibrary.Enums.Browser.NavigatorField.BuildId, buildIDSet[version]);
+	 
+	// Формируем набор версий операционной системы Windows
+	// 6.0 Windows Vista
+	// 6.1 Windows 7
+	// 6.2 Windows 8
+	// 6.3 Windows 8.1
+	// 10.0 Windows 10
+	string winOC = Macros.TextProcessing.Spintax("{6.0|6.1|6.2|6.3|10.0}");
+	string platform = Macros.TextProcessing.Spintax("{Win32|Win64}");
+	 
+	// Определяем "битность" самого приложения
+	string platformApp = string.Empty;
+	if(platform=="Win32"){
+	    platformApp = Macros.TextProcessing.Spintax("{; WOW64|}");
+	} else {
+	    platformApp = "; Win64; x64";
+	}
+	// Устанавливаем Useragent
+	project.Profile.UserAgent = string.Format("Mozilla/5.0 (Windows NT {0}{1}; rv:{2}.0) Gecko/20100101 Firefox/{2}.0", winOC, platformApp, version);
+	project.Profile.UserAgentAppVersion = "5.0 (Windows)";
+	project.Profile.UserAgentAppName = "Netscape";
+	project.Profile.UserAgentAppCodeName = "Mozilla";
+	project.Profile.UserAgentProduct = "Gecko";
+	project.Profile.UserAgentProductSub = "20100101";
+	 
+	// OC
+	project.Profile.UserAgentOsCpu = string.Format("Windows NT {0}{1}", winOC, platformApp);
+	project.Profile.UserAgentPlatform = platform;
+}
+string strUserList = project.Variables["user_list"].Value;
+string strUserAgent = string.Empty;
+if (strUserList!=string.Empty) {
+	strUserAgent = lstSites[0];
+	lstSites.RemoveAt(0);
+	lstSites.Add(strUserAgent);
+	project.Profile.UserAgent = string.Empty;
+	project.Profile.UserAgent = strUserAgent;
+}
+bool blnInstance = Convert.ToBoolean(project.Variables["instance_random"].Value);
+if (blnInstance) {
+	// Формируем набор популярных десктопных разрешений [Идея хранения позаимствована у doc'a, за что ему большая благодарность!]
+	int [,] resolutionSet = {
+	    {2880, 1800},
+	    {2560, 1600},
+	    {2560, 1440},
+	    {1920, 1200},
+	    {1920, 1080},
+	    {1680, 1050},
+	    {1600, 1200},
+	    {1600, 900},
+	    {1440, 900},
+	    {1366, 768},
+	    {1360, 768},
+	    {1280, 1024},
+	    {1280, 800},
+	    {1280, 768},
+	    {1152, 864},
+	    {1080, 1920},
+	    {1024, 768}
+	};
+	// Получаем рандомное разрешение и устанавливаем
+	int resolution = rndGenerator.Next(resolutionSet.Length/2);
+	project.Profile.ScreenSizeWidth = resolutionSet[resolution, 0];
+	project.Profile.ScreenSizeHeight = resolutionSet[resolution, 1];
+	instance.SetWindowSize(project.Profile.ScreenSizeWidth, project.Profile.ScreenSizeHeight);
+}
+bool blnRandomScreen = Convert.ToBoolean(project.Variables["random_screen"].Value);
+if (blnRandomScreen) {
+// Видимая область
+	project.Profile.AvailScreenWidth = project.Profile.ScreenSizeWidth-17;
+	project.Profile.AvailScreenHeight = project.Profile.ScreenSizeHeight-40;
+	// Глубина цвета монитора (Color Depth)
+	// [Чуть позже будет обновление механизма установки этого параметра]
+	instance.SetScreenPreference("screen_color_depth", 24);
+}
+
+bool blnPlugin = Convert.ToBoolean(project.Variables["plugin"].Value);
+if (blnPlugin) {
+	// Получаем список плагинов
+	var PluginList = instance.GetPlugins().ToList();
+	// По очерёдно в цикле скрываем все плагины
+	for (i=0; i < PluginList.Count; i++){
+	   instance.HidePlugin(PluginList[i]);
+	}
+}
+
+bool blnCPU = Convert.ToBoolean(project.Variables["cpu"].Value);
+if (blnCPU) {
+// Формируем набор возможных вариантов
+	string cpu = Macros.TextProcessing.Spintax("{2|4|6|8}");
+	 
+	instance.ShowNavigatorField(ZennoLab.InterfacesLibrary.Enums.Browser.NavigatorField.HardwareConcurrency);
+	// Устанавливаем рандомное кол-во ядер процессора
+	instance.SetHeader(ZennoLab.InterfacesLibrary.Enums.Browser.NavigatorField.HardwareConcurrency, cpu);
+}
+bool blnTouch = Convert.ToBoolean(project.Variables["touch"].Value);
+if (blnTouch) {
+	instance.SetBrowserPreference("dom.w3c_touch_events.enabled", 1); // Включаем сенсорные события
+	instance.ShowNavigatorField(ZennoLab.InterfacesLibrary.Enums.Browser.NavigatorField.MaxTouchPoints);
+	instance.SetHeader(ZennoLab.InterfacesLibrary.Enums.Browser.NavigatorField.MaxTouchPoints, "5"); // Устанавливаем 5 (например) максимальных одновременных касаний.
+}
+bool blnPixel = Convert.ToBoolean(project.Variables["pixel_ratio"].Value);
+if (blnPixel) {
+	//instance.ActiveTab.PageScale = rndGenerator.Next(90,150); // Устанавливаем Pixel Ratio в 150%
+}
+
+bool blnWebStorage = Convert.ToBoolean(project.Variables["web_storage"].Value);
+if (blnWebStorage) {
+	instance.SetBrowserPreference("dom.storage.enabled", false);
+}
+bool blnIndexedDB = Convert.ToBoolean(project.Variables["IndexedDB"].Value);
+if (blnIndexedDB) {
+	instance.SetBrowserPreference("dom.indexedDB.enabled", false);
+}
+//bool blnSuperCookie = Convert.ToBoolean(project.Variables["hsts"].Value);
+//if (blnSuperCookie) {
+//	// Оповещения
+//	bool msgType = false; // true - выводить оповщения в лог ZP, false - не выводить.
+//	// Считываем глобальные настройки ZennoPoster, чтобы получить путь к "Trash" папке, где будет храниться всё то, что нам нужно
+//	string globalSettings = File.ReadAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"ZennoLab\ZennoPoster\5\Settings\globalsettings.settings"));
+//	globalSettings = Regex.Match(globalSettings, @"(?<=clnName>CacheCookiePath</[^<]+>(\s+)?<clnType>[^<]+</[^<]+>(\s+)?<clnValue>)[^<]+").Value;
+//	// Получаем путь к Trash папке
+//	// Формируем путь директории,где будем искать данные HSTS в профилях
+//	string dirBaseProfile = (globalSettings==@"\Trash")?string.Format(@"{0}\Trash\Profiles\", System.IO.Directory.GetParent("ZennoPoster").ToString()):string.Format(@"{0}\", globalSettings);
+//	//Кладём все найденные папки в список
+//	List<string> lst = new List<string>();
+//	// Ищем папки в профилях, созданные base.exe
+//	lst = System.IO.Directory.GetDirectories(dirBaseProfile).ToList();
+//	if (Global.Variables.IsProjectMaker) lst.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"ZennoLab\ZennoPoster\5\ProjectMaker\Browser\Debug")); // для PM
+//	string pathBase = string.Empty;
+//	// Чистим файлы в цикле для всех баз (base.exe)
+//	while (lst.Count>0) {
+//		if (lst.Count==0) break;
+//		  pathBase = string.Format(@"{0}\SiteSecurityServiceState.txt", lst[0]);
+//		  lst.RemoveAt(0);
+//		  FileInfo file = new FileInfo(pathBase);
+//		  if (file.Exists) {
+//			if (File.GetAttributes(pathBase).ToString()=="ReadOnly") {
+//				continue;
+//			} else {
+//				project.SendInfoToLog(string.Format("Почищен и заблокирован {0}", pathBase), msgType);
+//				File.WriteAllText(pathBase, string.Empty);
+//				File.SetAttributes(pathBase, FileAttributes.ReadOnly);
+//			}
+//		 }
+//	}
+//}
+bool blnGeo = Convert.ToBoolean(project.Variables["geo"].Value);
+bool blnTime = Convert.ToBoolean(project.Variables["time"].Value);
+string strProxyList = project.Variables["proxy"].Value;
+string strProxy = string.Empty;
+string strProyType = string.Empty;
+List<string> lstProxyTemp = new List<string>();
+if (strProxyList!=string.Empty) {
+	if (lstProxy.Count==0) {
+		project.SendInfoToLog("Добавьте прокси в список, на данным момент работаем без прокси",true);
+	}
+	lock (SyncObjects.ListSyncer) {
+		strProxy = lstProxy[0];
+		strProyType = new Regex(@".*(?=://)").Match(strProxy).Value;
+		for (i=0; i<tblResult.RowCount; i++) {
+			string[] cellss = tblResult.GetRow(i).ToArray();
+			string strProverkaProxy = cellss[2];
+			if (strProverkaProxy==string.Empty) break;
+			if (strProverkaProxy.Contains(strProxy)) {
+				foreach (string Proxy in lstProxy) {
+					if (lstUsedProxy.Contains(Proxy)) lstProxyTemp.Add(Proxy);
+				}
+				int ColProxy = lstProxyTemp.Count;
+				int ColProxyInput = Convert.ToInt32(project.Variables["proxy_used"].Value);
+				if (ColProxy==ColProxyInput) strProxy = lstProxy[0];
+			} else {
+				continue;
+			}
+		}
+		project.Variables["proxy_table"].Value = strProxy;
+		lstProxy.RemoveAt(0);
+		lstProxy.Add(strProxy);
+		lstUsedProxy.Add(strProxy);
+		if (strProyType.Contains("soc")) {
+			instance.SetProxy(strProxy, true, false, false);
+			if (blnGeo) {
+				instance.SetProxy(strProxy, true, true, false);
+			}
+			if (blnTime) {
+				instance.SetProxy(strProxy, true, true, true);
+			}   
+		} else {
+			instance.SetProxy(strProxy, false, false, false);
+			if (blnGeo) {
+				instance.SetProxy(strProxy, false, true, false);
+			}
+			if (blnTime) {
+				instance.SetProxy(strProxy, false, true, true);
+			} 
+		}
+		// проверяем прокси
+		for (int g=0; g<10; g++) {
+			project.SendInfoToLog("Проверяю прокси на валидность",true);
+			string strProxyUsed1 = ZennoPoster.HttpGet("https://www.google.com/", strProxy, "UTF-8", ZennoLab.InterfacesLibrary.Enums.Http.ResponceType.HeaderOnly, 30000,
+				"");
+			if (!strProxyUsed1.Contains("200 OK")) {
+				project.SendInfoToLog("Прокси невалидные, устанавливаю другие прокси",true);
+				strProxy = lstProxy[0];
+				lstProxy.RemoveAt(0);
+				lstProxy.Add(strProxy);
+				instance.SetProxy(strProxy, true, true, true);
+				continue;
+			} else {
+				project.SendInfoToLog("Прокси валидные",true);
+				break;
+			}	
+		}
+		string strAPIResponse = ZennoPoster.HttpGet("https://whoer.net/ru", strProxy, "UTF-8", ZennoLab.InterfacesLibrary.Enums.Http.ResponceType.BodyOnly, 30000);
+		strAPIResponse = new Regex(@"(?<=<span\ class=""cont\ \ overdots"">)[\w\W]*?(?=</dd>)").Match(strAPIResponse).Value;
+		if (strAPIResponse.Contains("Ru") || strAPIResponse.Contains("ru")) {
+			Random r = new Random();
+			string[] acceptLanguageSet = {
+			    "ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4",
+			    "ru-RU,ru;q=0.9,en;q=0.8",
+			    "ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3"
+			};
+			// Устанавливаем Accept-Language
+			string acceptLanguage = acceptLanguageSet[r.Next(0, acceptLanguageSet.Length)].ToString();
+			project.Profile.AcceptLanguage = acceptLanguage;
+			// Устанавливаем настройки языка
+			project.Profile.UserAgentBrowserLanguage = acceptLanguage.Substring(0, acceptLanguage.IndexOf(','));
+			project.Profile.UserAgentLanguage = acceptLanguage.Substring(0, acceptLanguage.IndexOf(','));
+		} else {
+			Random R = new Random();
+			string[] acceptLanguageSet1 = {
+					"en-US,en;q=0.5"
+			};
+			string acceptLanguage1 = acceptLanguageSet1[R.Next(0, acceptLanguageSet1.Length)].ToString();
+			project.Profile.AcceptLanguage = acceptLanguage1;
+			// Устанавливаем настройки языка
+			project.Profile.UserAgentBrowserLanguage = acceptLanguage1.Substring(0, acceptLanguage1.IndexOf(','));
+			project.Profile.UserAgentLanguage = acceptLanguage1.Substring(0, acceptLanguage1.IndexOf(','));
+		}
+	}
+} else {
+	string strAPIResponse2 = ZennoPoster.HttpGet("https://whoer.net/ru", strProxy, "UTF-8", ZennoLab.InterfacesLibrary.Enums.Http.ResponceType.BodyOnly, 30000);
+	strAPIResponse2 = new Regex(@"(?<=\n<span\ class=""cont"">)[\w\W]*(?=<span\ class=""ico-holder\ region"">)").Match(strAPIResponse2).Value;
+	if (strAPIResponse2.Contains("Rus") || strAPIResponse2.Contains("rus")) {
+		Random ra = new Random();
+		string[] acceptLanguageSet2 = {
+		    "ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4",
+		    "ru-RU,ru;q=0.9,en;q=0.8",
+		    "ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3"
+		};
+		// Устанавливаем Accept-Language
+		string acceptLanguage2 = acceptLanguageSet2[ra.Next(0, acceptLanguageSet2.Length)].ToString();
+		project.Profile.AcceptLanguage = acceptLanguage2;
+		// Устанавливаем настройки языка
+		project.Profile.UserAgentBrowserLanguage = acceptLanguage2.Substring(0, acceptLanguage2.IndexOf(','));
+		project.Profile.UserAgentLanguage = acceptLanguage2.Substring(0, acceptLanguage2.IndexOf(','));
+	} else {
+		Random Ra = new Random();
+		string[] acceptLanguageSet3 = {
+				"en-US,en;q=0.5"
+		};
+		string acceptLanguage3 = acceptLanguageSet3[Ra.Next(0, acceptLanguageSet3.Length)].ToString();
+		project.Profile.AcceptLanguage = acceptLanguage3;
+		// Устанавливаем настройки языка
+		project.Profile.UserAgentBrowserLanguage = acceptLanguage3.Substring(0, acceptLanguage3.IndexOf(','));
+		project.Profile.UserAgentLanguage = acceptLanguage3.Substring(0, acceptLanguage3.IndexOf(','));
+	}
+	instance.SetProxy("", false, true, true);
+}
+bool blnWebRTC = Convert.ToBoolean(project.Variables["webRTC"].Value);
+if (blnWebRTC) {
+	int ip = 192;
+	int ip1 = 168;
+	int ip2 = rndGenerator.Next(0,1);
+	int ip3 = rndGenerator.Next(1,255);
+	string proxys = ip.ToString()+"."+ip1.ToString()+"."+ip2.ToString()+"."+ip3.ToString(); // Укажите здесь желаемый адрес, который Вы хотите подсунуть WebRTC вместо реального (локального).
+	instance.WebRTCWorkMode = ZennoLab.InterfacesLibrary.Enums.Browser.WebRTCMode.Emulate;
+	instance.SetWebRTCAdresses(proxys);
+}
+bool blnDNT = Convert.ToBoolean(project.Variables["dnt"].Value);
+if (blnDNT) {
+	instance.ShowNavigatorField(ZennoLab.InterfacesLibrary.Enums.Browser.NavigatorField.DoNotTrack);
+	instance.SetHeader(ZennoLab.InterfacesLibrary.Enums.Browser.NavigatorField.DoNotTrack, "1"); // Включает Do Not Track
+}
+bool blnWebGL = Convert.ToBoolean(project.Variables["webRTC"].Value);
+if (blnWebGL) {
+	instance.SetBrowserPreference("webgl.disabled", true);
+	//instance.SetBrowserPreference("webgl.enable-webgl2", false); // WebGL 2.0 не поддерживается текущей версией движка Mozilla Firefox, используемой в ZennoPoster 5.11.1.0
+	instance.SetBrowserPreference("webgl.disable-extensions", true);
+	instance.SetBrowserPreference("webgl.min_capability_mode", true);
+}
+bool blnFonts = Convert.ToBoolean(project.Variables["fonts"].Value);
+if (blnFonts) {
+	List<string> lstTiff = new List<string>() {
+		"Arial.ttf",
+		"time new roman.ttf",
+		"Verdana.ttf",
+		"Tahoma.ttf",
+	};
+	string nameFont = string.Empty;
+	int rnd = rndGenerator.Next(0, lstTiff.Count);
+	nameFont = lstTiff[rnd];
+	CommonCode.Fonts.SetupFont(project, nameFont, @"C:\Fonts\"); // Установка шрифта. 3-й аргумент это директория, в которой он находится.
+}
+bool blnMac = Convert.ToBoolean(project.Variables["mac"].Value);
+if (blnMac) {
+	var handle = AutoItX.WinGetHandle("Technitium MAC Address Changer v6 - by Shreyas Zare");
+	var listview = AutoItX.ControlGetHandle(handle, "[CLASS:ListView20WndClass; INSTANCE:10]");
+	AutoItX.WinActivate(handle);
+	var count = AutoItX.ControlListView(handle, listview, "GetItemCount", "", "");
+	AutoItX.ControlListView(handle, listview, "Select", "0", "1");
+	 
+	var randomBtn = AutoItX.ControlGetHandle(handle, "ThunderRT6CommandButton7");
+	AutoItX.ControlClick(handle, randomBtn);
+	 
+	var changeBtn = AutoItX.ControlGetHandle(handle, "ThunderRT6CommandButton6");
+	AutoItX.ControlClick(handle, changeBtn);
+}
+bool blnWhoer = Convert.ToBoolean(project.Variables["whoer"].Value);
+if (blnWhoer) {
+	Tab1.Navigate("https://whoer.net/ru");
+	Tab1.WaitDownloading();
+	while (true) {
+		Thread.Sleep(500);
+		if(((ZennoLab.InterfacesLibrary.ProjectModel.Collections.IContextExt)project.Context).IsInterrupted) return null;
+	}
+}
